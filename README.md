@@ -1,3 +1,16 @@
+# Forked REPO
+
+### Modifications
+
+* Changed Daikin operation modes
+    * 0 = fan
+    * 1 = heat
+    * 2 = cool
+    * 3 = Auto
+    * 6 = Dehumidification
+
+
+---------------------------------------------------------------------------------------------------
 [![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)
 ![node](https://img.shields.io/node/v/homebridge-daikin-local)
 [![npm](https://img.shields.io/npm/dt/homebridge-daikin-local.svg)](https://www.npmjs.com/package/homebridge-daikin-local)

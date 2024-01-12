@@ -97,7 +97,7 @@ function Daikin(log, config) {
 
   if (config.defaultMode === undefined) {
     this.log.warn('ERROR: your configuration is missing the parameter "defaultMode", using default');
-    this.defaultMode = '1';
+    this.defaultMode = '2';
     this.log.debug('Config: defaultMode is %s', this.defaultMode);
   } else {
     this.log.debug('Config: defaultMode is %s', config.defaultMode);
@@ -106,7 +106,7 @@ function Daikin(log, config) {
 
   if (config.defaultMode === 0) {
     this.log.error('ERROR: the parameter "defaultMode" is set to an illegal value of "0". Going to use a value of "1" (Auto) instead.');
-    this.defaultMode = '1';
+    this.defaultMode = '2';
   }
 
   switch (config.fanMode) {
@@ -408,7 +408,7 @@ Daikin.prototype = {
           const responseValues = this.parseResponse(body);
           this.log.debug('getActive: Power is: %s, Mode is %s', responseValues.pow, responseValues.mode);
           let HomeKitState = '0';
-          if (responseValues.mode === '6' || responseValues.mode === '2' || responseValues.mode === '1') // If AC is in Fan-mode, or in Humidity-mode then show AC OFF in HomeKit
+          if (responseValues.mode === '7' || responseValues.mode === '0') // If AC is in Fan-mode, or in Humidity-mode then show AC OFF in HomeKit
             HomeKitState = '0';
           else
             if (responseValues.pow === '1')
@@ -433,9 +433,9 @@ Daikin.prototype = {
         const responseValues = this.parseResponse(body);
         this.log.info('setActive: Power is %s, Mode is %s. Going to change power to %s.', responseValues.pow, responseValues.mode, power);
         let query = body.replace(/,/g, '&').replace(/pow=[01]/, `pow=${power}`);
-        if (responseValues.mode === '6' || responseValues.mode === '2' || responseValues.mode === '1' || responseValues.mode === '0') {// If AC is in Fan-mode, or an Humidity-mode then use the default mode.
+        if (responseValues.mode === '7' || responseValues.mode === '0') {// If AC is in Fan-mode, or an Humidity-mode then use the default mode.
           switch (this.defaultMode) {
-            case '1': { // Auto
+            case '3': { // Auto
             this.log.warn('Auto');
               query = query
                 .replace(/mode=[01234567]/, `mode=${this.defaultMode}`)
@@ -444,7 +444,7 @@ Daikin.prototype = {
                 .replace(/shum=--/, `shum=${'0'}`);
                 break;}
 
-            case '3': { // COOL
+            case '2': { // COOL
               query = query
                 .replace(/mode=[01234567]/, `mode=${this.defaultMode}`)
                 .replace(/stemp=--/, `stemp=${responseValues.dt7}`)
@@ -452,7 +452,7 @@ Daikin.prototype = {
                 .replace(/shum=--/, `shum=${'0'}`);
                 break;}
 
-                case '4': { // HEAT
+                case '1': { // HEAT
                   query = query
                     .replace(/mode=[01234567]/, `mode=${this.defaultMode}`)
                     .replace(/stemp=--/, `stemp=${responseValues.dt5}`)
@@ -532,18 +532,17 @@ Daikin.prototype = {
               let status = Characteristic.CurrentHeaterCoolerState.INACTIVE;
               if (responseValues.pow === '1') {
                   switch (responseValues.mode) {
-                      case '0': // Auto
-                      case '1': // humidification
-                      case '2': // dehumidification
-                      case '6': { // FAN-Mode
+                      case '3': // Auto
+                      case '7': // dehumidification
+                      case '0': { // FAN-Mode
                           status = Characteristic.CurrentHeaterCoolerState.IDLE;
                           break;}
 
-                          case '3': {
+                          case '2': {
                           status = Characteristic.CurrentHeaterCoolerState.COOLING;
                           break;}
 
-                          case '4': {
+                          case '1': {
                           status = Characteristic.CurrentHeaterCoolerState.HEATING;
                           break;}
 
@@ -575,27 +574,23 @@ Daikin.prototype = {
                 let status = Characteristic.TargetHeaterCoolerState.AUTO;
                 if (responseValues.pow === '1') {
                     switch (responseValues.mode) {
-                        case '0': { // automatic
+                        case '3': { // automatic
                             status = Characteristic.TargetHeaterCoolerState.AUTO;
                             break;}
 
-                        case '1': { // humidification
+                        case '7': { // dehumidification
                             status = Characteristic.TargetHeaterCoolerState.AUTO;
                             break;}
 
-                        case '2': { // dehumidification
-                            status = Characteristic.TargetHeaterCoolerState.AUTO;
-                            break;}
-
-                        case '3': { // cool
+                        case '2': { // cool
                             status = Characteristic.TargetHeaterCoolerState.COOL;
                             break;}
 
-                        case '4': { // heat
+                        case '1': { // heat
                             status = Characteristic.TargetHeaterCoolerState.HEAT;
                             break;}
 
-                        case '6': { // AUTO or FAN
+                        case '0': { // AUTO or FAN
                             status = Characteristic.TargetHeaterCoolerState.AUTO;
                             break;}
 
@@ -628,17 +623,17 @@ Daikin.prototype = {
                   switch (state) {
                       case Characteristic.TargetHeaterCoolerState.AUTO: {
                           this.log.info('HomeKit requested the AC to operate in AUTO mode.');
-                          mode = 0;
+                          mode = 3;
                           break;}
 
                       case Characteristic.TargetHeaterCoolerState.COOL: {
                           this.log.info('HomeKit requested the AC to operate in COOL mode.');
-                          mode = 3;
+                          mode = 2;
                           break;}
 
                       case Characteristic.TargetHeaterCoolerState.HEAT: {
                           this.log.info('HomeKit requested the AC to operate in HEAT mode.');
-                          mode = 4;
+                          mode = 1;
                           break;}
 
                       default: {
