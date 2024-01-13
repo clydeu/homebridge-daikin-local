@@ -9,6 +9,8 @@
     * 3 = Auto
     * 6 = Dehumidification
 
+* Add support for Zones
+    * Each zone will have a switch for the accessory
 
 ---------------------------------------------------------------------------------------------------
 [![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)

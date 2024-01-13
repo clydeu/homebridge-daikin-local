@@ -210,6 +210,8 @@ function Daikin(log, config) {
       this.get_model_info = this.apiroute + '/skyfi/aircon/get_model_info';
       this.set_control_info = this.apiroute + '/skyfi/aircon/set_control_info';
       this.basic_info = this.apiroute + '/skyfi/common/basic_info';
+      this.get_zone_setting = this.apiroute + '/skyfi/aircon/get_zone_setting';
+      this.set_zone_setting = this.apiroute + '/skyfi/aircon/set_zone_setting';
       break;}
 
     default: {
@@ -225,6 +227,7 @@ function Daikin(log, config) {
   this.log.debug('Get_control_info %s', this.get_control_info);
   this.log.debug('Get_model_info %s', this.get_model_info);
   this.log.debug('Get_basic_info %s', this.basic_info);
+  this.log.debug('get_zone_setting %s', this.get_zone_setting);
 
   this.firmwareRevision = packageFile.version;
 
@@ -255,15 +258,17 @@ function Daikin(log, config) {
   this.counter = 0;
   this.lastMode = 3; /* cooling */
   this.lastFanSpeed = 10; /* Silent */
+  this.zoneStatus = [0,0,0,0,0,0,0,0]
 
   // description arrays
-  this.modeDescription = ['off', 'Auto', 'Dehumidification', 'Cooling', 'Heating', 'unknown:5', 'Fan'];
+  this.modeDescription = ['Fan', 'Heating', 'Cooling', 'Auto', 'unknown:4' ,'unknown:5', 'Dehumidification'];
   this.powerDescription = ['off', 'on'];
 
   this.FanService = new Service.Fan(this.fanName);
   this.heaterCoolerService = new Service.HeaterCooler(this.name);
   this.temperatureService = new Service.TemperatureSensor(this.name);
   this.humidityService = new Service.HumiditySensor(this.name);
+  this.zoneServices = [new Service.Switch("Zone 1", "zone1"), new Service.Switch("Zone 2", "zone2"), new Service.Switch("Zone 3", "zone3"), new Service.Switch("Zone 4", "zone4")]
 }
 
 Daikin.prototype = {
@@ -992,6 +997,42 @@ getFanSpeed: function (callback) {
     callback(error);
   },
 
+  getZoneStatus: function (zone, callback) {
+    this.sendGetRequest(this.get_zone_setting, body => {
+      this.log.debug('getZoneStatus: Zone #: %s.', zone);
+      const responseValues = this.parseResponse(body);
+      this.zoneStatus = decodeURIComponent(responseValues.zone_onoff).split(';')
+      this.zoneNames = responseValues.zone_name
+      this.log.debug('Zone Status: %s.', this.zoneStatus.join(","));
+      callback(null, this.zoneStatus[zone - 1] === '1');
+    });
+  },
+
+  getZoneStatusFV(zone, callback) {
+    const counter = ++this.counter;
+    this.log.debug('getZoneStatusFV: early callback with cached Status: %s (counter: %d).', this.zoneStatus[zone], counter);
+    callback(null, this.zoneStatus[zone - 1] === '1');
+    this.getZoneStatus(zone, (error, HomeKitState) => {
+      this.zoneServices[zone - 1].getCharacteristic(Characteristic.On).updateValue(HomeKitState);
+      this.log.debug('getZoneStatusFV: update Status: %s (counter: %d).', HomeKitState ? 'on' : 'off', counter);
+    });
+  },
+
+  setZoneStatus: function (zone, value, callback) {
+    let targetPOW = 0;
+    if (value === true)
+      targetPOW = 1;
+
+    this.log.debug('setZoneStatus: Zone #:  %s (%s).', zone, targetPOW)
+    this.zoneStatus[zone -1] = targetPOW;
+    const query = `zone_name=${this.zoneNames}&zone_onoff=${encodeURIComponent(this.zoneStatus.join(";"))}`;
+    this.log.debug('setZoneStatus: going to send this query: %s', query);
+ 
+    this.sendGetRequest(this.set_zone_setting + '?' + query, _response => {
+      if (!(callback === undefined)) callback();
+    }, {skipCache: true, skipQueue: true});
+  },
+
 	getServices: function () {
     const informationService = new Service.AccessoryInformation();
 
@@ -1073,8 +1114,14 @@ getFanSpeed: function (callback) {
         .on('get', this.getCurrentHumidityFV.bind(this));
     }
 
+    this.zoneServices.forEach((item, i) => 
+      item.getCharacteristic(Characteristic.On)
+      .on('get', this.getZoneStatusFV.bind(this, i + 1))
+      .on('set', this.setZoneStatus.bind(this, i + 1)));
+
     // const services = [informationService, this.heaterCoolerService, this.temperatureService];
     const services = [informationService, this.heaterCoolerService];
+    services.push(...this.zoneServices)
     // if (this.disableFan === false)
     //   services.splice(services.indexOf(this.temperatureService), 0, this.FanService);
     if (this.disableFan === false)
